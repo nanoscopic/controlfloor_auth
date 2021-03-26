@@ -1,4 +1,4 @@
-module main.go
+module github.com/nanoscopic/controlfloor_auth
 
 go 1.12
 
