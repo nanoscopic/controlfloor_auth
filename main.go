@@ -10,6 +10,7 @@ import (
 
 type AuthHandler interface {
     UserAuth( c *gin.Context ) bool
+    UserLogin( c *gin.Context ) bool
 }
 
 type SessionManager interface {
@@ -18,25 +19,90 @@ type SessionManager interface {
     WriteSession( c *gin.Context )
 }
 
+type authUser struct {
+    userName string
+    password string
+}
+
 type demoAH struct {
     sessionManager SessionManager
+    testParam      string
+    testUser       string
+    users          []authUser
 }
 
 func NewAuthHandler( confRoot uj.JNode, sessionManager SessionManager ) AuthHandler {
-    return &demoAH{ sessionManager }
+    self := &demoAH{
+        sessionManager: sessionManager,
+        testParam: "",
+        testUser: "test",
+        users: []authUser{},
+    }
+    
+    authNode := confRoot.Get("auth")
+    if authNode != nil {
+        dummyNode := authNode.Get("dummy")
+        if dummyNode != nil {
+            testParamNode := dummyNode.Get("testparam")
+            if testParamNode != nil {
+                self.testParam = testParamNode.String()
+            } else {
+                fmt.Printf("Missing conf auth.dummy.testparam node\n")
+            }
+            testUserNode := dummyNode.Get("testuser")
+            if testUserNode != nil {
+                self.testUser = testUserNode.String()
+            } else {
+                fmt.Printf("Missing conf auth.dummy.testuser node\n")
+            }
+            
+            usersNode := dummyNode.Get("users")
+            if usersNode != nil {
+                users := []authUser{}
+                usersNode.ForEach( func( user uj.JNode ) {
+                    userNameNode := user.Get("userName")
+                    pwNode := user.Get("password")
+                    if userNameNode != nil && pwNode != nil {
+                        user := authUser{
+                            userName: userNameNode.String(),
+                            password: pwNode.String(),
+                        }
+                        users = append( users, user )
+                    }
+                } )
+                self.users = users
+            } else {
+                fmt.Printf("Missing conf auth.dummy.users node\n")
+            }
+        } else {
+            fmt.Printf("Missing conf auth.dummy node\n")
+            authNode.Dump()
+        }
+        
+        
+    } else {
+        fmt.Printf("Missing conf auth node\n")
+    }
+    
+    return self
 }
 
 func (self *demoAH) UserAuth( c *gin.Context ) bool {
     authPass := false
     
-    _, uok := c.GetQuery("ok")
-    if uok {
-        sm := self.sessionManager
-        s := sm.GetSession(c)
-        scsSM := sm.GetSCSSessionManager()
-        scsSM.Put( s, "user", "test" )
-        sm.WriteSession( c )
-        authPass = true
+    fmt.Printf("uauth\n")
+    
+    if self.testParam != "" {
+        fmt.Printf("checking for %s\n", self.testParam)
+        _, uok := c.GetQuery( self.testParam )
+        if uok {
+            sm := self.sessionManager
+            s := sm.GetSession(c)
+            scsSM := sm.GetSCSSessionManager()
+            scsSM.Put( s, "user", self.testUser )
+            sm.WriteSession( c )
+            authPass = true
+        }
     }
     
     if authPass {
@@ -51,3 +117,24 @@ func (self *demoAH) UserAuth( c *gin.Context ) bool {
     return false
 }
 
+func (self *demoAH) UserLogin( c *gin.Context ) bool {
+    s := self.sessionManager.GetSession( c )
+    scsSM := self.sessionManager.GetSCSSessionManager()
+    
+    user := c.PostForm("user")
+    pass := c.PostForm("pass")
+    
+    for _,u := range self.users {
+        if user == u.userName && pass == u.password {
+            fmt.Printf( "login ok; user=%s\n", u.userName )
+            
+            scsSM.Put( s, "user", u.userName )
+            self.sessionManager.WriteSession( c )
+            
+            return true
+        }
+    }
+    
+    fmt.Printf( "login failed; user=%s\n", user )
+    return false
+}
