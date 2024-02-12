@@ -31,7 +31,7 @@ type demoAH struct {
     users          []authUser
 }
 
-func NewAuthHandler( confRoot uj.JNode, sessionManager SessionManager ) AuthHandler {
+func NewAuthHandler( authNode uj.JNode, sessionManager SessionManager ) AuthHandler {
     self := &demoAH{
         sessionManager: sessionManager,
         testParam: "",
@@ -39,47 +39,38 @@ func NewAuthHandler( confRoot uj.JNode, sessionManager SessionManager ) AuthHand
         users: []authUser{},
     }
     
-    authNode := confRoot.Get("auth")
     if authNode != nil {
-        dummyNode := authNode.Get("dummy")
-        if dummyNode != nil {
-            testParamNode := dummyNode.Get("testparam")
-            if testParamNode != nil {
-                self.testParam = testParamNode.String()
-            } else {
-                fmt.Printf("Missing conf auth.dummy.testparam node\n")
-            }
-            testUserNode := dummyNode.Get("testuser")
-            if testUserNode != nil {
-                self.testUser = testUserNode.String()
-            } else {
-                fmt.Printf("Missing conf auth.dummy.testuser node\n")
-            }
-            
-            usersNode := dummyNode.Get("users")
-            if usersNode != nil {
-                users := []authUser{}
-                usersNode.ForEach( func( user uj.JNode ) {
-                    userNameNode := user.Get("userName")
-                    pwNode := user.Get("password")
-                    if userNameNode != nil && pwNode != nil {
-                        user := authUser{
-                            userName: userNameNode.String(),
-                            password: pwNode.String(),
-                        }
-                        users = append( users, user )
-                    }
-                } )
-                self.users = users
-            } else {
-                fmt.Printf("Missing conf auth.dummy.users node\n")
-            }
+        testParamNode := authNode.Get("testparam")
+        if testParamNode != nil {
+            self.testParam = testParamNode.String()
         } else {
-            fmt.Printf("Missing conf auth.dummy node\n")
-            authNode.Dump()
+            fmt.Printf("Missing conf auth.testparam node\n")
+        }
+        testUserNode := authNode.Get("testuser")
+        if testUserNode != nil {
+            self.testUser = testUserNode.String()
+        } else {
+            fmt.Printf("Missing conf auth.testuser node\n")
         }
         
-        
+        usersNode := authNode.Get("users")
+        if usersNode != nil {
+            users := []authUser{}
+            usersNode.ForEach( func( user uj.JNode ) {
+                userNameNode := user.Get("userName")
+                pwNode := user.Get("password")
+                if userNameNode != nil && pwNode != nil {
+                    user := authUser{
+                        userName: userNameNode.String(),
+                        password: pwNode.String(),
+                    }
+                    users = append( users, user )
+                }
+            } )
+            self.users = users
+        } else {
+            fmt.Printf("Missing conf auth.users node\n")
+        }
     } else {
         fmt.Printf("Missing conf auth node\n")
     }
